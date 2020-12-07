@@ -1,5 +1,7 @@
-This project is to build an shinny app in R, and the app does the following:
-This app is built for people to search for the healthy cooking recipes based on what they have left at home of food materials and ingredient.
+This project is based on the fitness data shared on kaggle,it collected in a survey format with some multiple answers questions.
+The project mainly showcase how to deal with survey type of dataset,especially when there are many variables with multiple entry,
+due to the small sample size as well as the limited variables collected, the tasks done with such dataset is limited,reader will expect
+to follow alone the code I created to go through data cleaning process and some data visulization later on.
 
-Clarification:
-All recipes fitched from the cope are sourced from various websites,do not use it for commercial use.
+To run the code,readers simply download open up the R file called "fa1.R" then read in dataset labeled "fa.CSV". The purpose of each chunk of code
+is noted as markdown before the code.
