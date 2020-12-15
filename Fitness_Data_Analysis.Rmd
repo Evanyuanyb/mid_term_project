@@ -1,0 +1,190 @@
+---
+title: "Fitness_Data_Analysis"
+author: "Yibo Yuan"
+date: "12/14/2020"
+output: html_document
+---
+```{r setup, message=FALSE}
+library(ggplot2)
+library(dplyr)
+require(tidyverse)
+require(randomForest)
+require(ggpubr)
+require(reshape2)
+library("FactoMineR")
+library("factoextra")
+```
+
+## Cleaning the data
+```{r }
+df = read.csv('fa.csv')
+names(df)
+names(df) <- c('name','gender','age','importance','fitness_level','exercise_f','excuse',
+               'type','size','time','length','diet','diet_excuse','healthy','friends','equipment',
+               'motivation')
+df$gender <- as.factor(df$gender)
+df$age <- as.factor(df$age)
+df$importance <- as.factor(df$importance)
+df$fitness_level <- as.factor(df$fitness_level)
+df$exercise_f <- as.factor(df$exercise_f)
+df$size <- as.factor(df$size)
+df$time <- as.factor(df$time)
+df$length <- as.factor(df$length)
+df$diet <- as.factor(df$diet)
+df$healthy <- as.factor(df$healthy)
+df$friends <- as.factor(df$friends)
+df$equipment <- as.factor(df$equipment)
+```
+
+## Transform data structure to turn multiple choices answers into individual variable.
+
+Transforming variable:What barriers, if any, prevent you from exercising more regularly? (Select all that applies) resulting in new dataset called 'excu' containing 6 variables, each variable represent one unique answer to the original survey question.The value '0' from each row means that particular answers was not selected at the original survey question, and vice versa.
+
+```{r pressure, echo=TRUE}
+lev <- levels(factor(df$excuse))
+lev <- unique(unlist(strsplit(lev,  ";")))
+mnames <- gsub(" ","_", paste("exc", lev , sep = "."))
+excu <- matrix(data = "0" , nrow = length(df$excuse), ncol = length(lev))
+char.var <- as.character(df$excuse)
+for (i in 1:length(lev)) {
+  excu[grep(lev[i], char.var , fixed = TRUE), i] <- "1"
+}
+excu <- data.frame(excu, stringsAsFactors = TRUE)
+colnames(excu) <- mnames
+summary(excu)
+
+excu <- excu[,c("exc.I'll_become_too_tired","exc.I_don't_have_enough_time"
+              ,"exc.I_can't_stay_motivated","exc.I_have_an_injury"
+                ,"exc.I_don't_really_enjoy_exercising","exc.I_exercise_regularly_with_no_barriers")]
+```
+
+Transforming variable:What forms of exercise do you currently participate in? (Select all that applies) resulting in new dataset called 'ty' containing 8 variables, each variable represent one unique answer to the original survey question.The value '0' from each row means that particular answers was not selected at the original survey question, and vice versa.
+```{r}
+lev1 <- levels(factor(df$type))
+lev1 <- unique(unlist(strsplit(lev1,";")))
+mnames1 <- gsub(" ","_" , paste("type" , lev1 , sep = "."))
+ty <- matrix(data = "0" , nrow = length(df$type), ncol = length(lev1))
+char.var1 <- as.character(df$type)
+for (i in 1:length(lev1)) {
+  ty[grep(lev1[i],char.var1,fixed = TRUE), i] <- "1"
+}
+ty <- data.frame(ty, stringsAsFactors = TRUE)
+colnames(ty) <- mnames1
+summary(ty)
+```
+
+Transforming variable:What prevents you from eating a healthy balanced diet, if any? (Select all that applies) resulting in new dataset called 'dit' containing 5 variables, each variable represent one unique answer to the original survey question.The value '0' from each row means that particular answers was not selected at the original survey question, and vice versa.
+
+```{r}
+lev2 <- levels(factor(df$diet_excuse))
+lev2 <- unique(unlist(strsplit(lev2 , ";")))
+mnames2 <- gsub(" ","_" , paste("diet", lev2, sep = "."))
+dit <- matrix(data = "0", nrow = length(df$diet_excuse), ncol = length(lev2))
+char.var2 <- as.character(df$diet_excuse)
+for (i in 1:length(lev2)) {
+  dit[grep(lev2[i], char.var2, fixed = TRUE), i] <- "1"
+}
+dit <- data.frame(dit, stringsAsFactors = TRUE)
+colnames(dit) <- mnames2
+summary(dit)
+dit <- dit[,c("diet.Lack_of_time" ,"diet.Ease_of_access_to_fast_food","diet.Cost","diet.Temptation_and_cravings"
+              ,"diet.I_have_a_balanced_diet")]
+```
+
+Transforming variable:What motivates you to exercise? resulting in new dataset called 'motiv' containing 5 variables, each variable represent one unique answer to the original survey question.The value '0' from each row means that particular answers was not selected at the original survey question, and vice versa.
+
+```{r}
+lev3 <- levels(factor(df$motivation))
+lev3 <- unique(unlist(strsplit(lev3, ";")))
+mnames3 <- gsub(" ","_", paste("moti" , lev3 , sep = "."))
+motiv <- matrix(data = "0" , nrow = length(df$motivation), ncol = length(lev3))
+char.var3 <- as.character(df$motivation)
+for (i in 1:length(lev3)) {
+  motiv[grep(lev3[i], char.var3, fixed = TRUE), i] <- "1"
+}
+motiv <- data.frame(motiv, stringsAsFactors = TRUE)
+colnames(motiv) <- mnames3
+summary(motiv)
+motiv <- motiv[,c("moti.I_want_to_be_fit","moti.I_want_to_increase_muscle_mass_and_strength"
+                ,"moti.I_want_to_lose_weight","moti.I_want_to_be_flexible"
+                ,"moti.I_want_to_relieve_stress"
+                ,"moti.I_want_to_achieve_a_sporting_goal"
+                ,"moti.I'm_sorry_..._I'm_not_really_interested_in_exercising")]
+summary(motiv)
+```
+
+combining transformed dataset with original dataset with original survey questions
+as variables columns deleted.
+
+```{r}
+df <- cbind(df[,-c(7, 8, 13, 17)],excu,ty,dit,motiv)
+head(df)
+```
+
+motivation for exercise between male and female group
+
+```{r}
+newdata <- df %>% 
+  select(2,33:39)
+
+d4 <- melt(newdata,id = 'gender')
+d5 <- d4[d4$value == 1,]
+ggplot(d5,aes(variable,fill = gender)) + geom_bar(position = 'dodge')+
+  scale_x_discrete(name = "Motivation for Exercise",labels = c("Not interested in exercising",
+                            "Achieving sporting goal",
+                            "Stress relieve",
+                            "To be more flexible",
+                            "To lose weight",
+                            'Enhance muscle mass and strength',
+                            'To be fit')) + coord_flip()
+```
+
+exercise type between male and female group
+
+```{r}
+newdata1 <- df %>% 
+  select(2,20:27)
+
+ty.long <- melt(newdata1,id = 'gender')
+ty1 <- ty.long[ty.long$value == 1,]
+ggplot(ty1,aes(variable,fill = gender)) + geom_bar(position = 'dodge') +
+  scale_x_discrete(name = "Type of exercise",labels = c("Gym",
+                                                    "Lifting Weight",
+                                                    "Team Sport",
+                                                    "Swimming",
+                                                    "Yoga",
+                                                    'Zumba Dance',
+                                                    'No Exercise',
+                                                    'Walking or Jogging')) + coord_flip()
+```
+
+Does a person tend to exercise more with group or alone?
+
+```{r}
+ggplot(df,aes(size,fill = gender)) + geom_bar(position = 'dodge') +
+  scale_x_discrete(name = "Exercise Preference") +
+  scale_y_discrete(name = "Exercise Frequency") + coord_flip() +
+  facet_wrap( ~ exercise_f)
+```
+
+Does female see the importance of exercise different than male?
+
+```{r}
+chisq.test(table(df$gender,df$importance),simulate.p.value = T)
+ggplot(df,aes(gender,fill = importance)) + geom_bar(position = 'dodge')
+```
+
+Does the perceived importance of exercise vary based on age group?
+
+```{r}
+chisq.test(table(df$age,df$importance),simulate.p.value = T)
+ggplot(df,aes(age,fill = importance)) + geom_bar(position = 'dodge')
+```
+
+Linear model for the dataset with dummy variables
+
+```{r}
+model <- lm(as.numeric(healthy)~-1,data = df)
+model
+```
+
